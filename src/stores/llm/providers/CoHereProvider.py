@@ -90,3 +90,6 @@ class CoHereProvider(LLMInterface):
 
 
             return response.embeddings.float[0]
+
+    def construct_prompt(self, prompt: str, role: str):
+        pass
