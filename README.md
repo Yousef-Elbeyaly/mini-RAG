@@ -54,6 +54,7 @@ Download the POSTMAN collection from [/assets/mini-rag-app.postman_collection.js
 
 ```bash
 $ cd docker
+$ sudo docker compose up  -d
 $ cp .env.example .env
 ```
 - update `.env` with your credentials

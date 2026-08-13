@@ -24,9 +24,13 @@ class OpenAIProvider(LLMInterface):
 
             self.client = OpenAI(
             api_key = self.api_key,
-            base_url= self.api_url if self.api_url and len(self.api_url) else None
+            base_url= self.api_url if self.api_url and len(self.api_url) else None,
+            timeout=180.0,
             )
 
+
+            print(f"👉 REAL CLIENT BASE URL: {self.client.base_url}")
+            
             self.enums = OpenAIEnums
             self.logger = logging.getLogger(__name__)
 
