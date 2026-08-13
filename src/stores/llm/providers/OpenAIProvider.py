@@ -29,7 +29,6 @@ class OpenAIProvider(LLMInterface):
             )
 
 
-            print(f"👉 REAL CLIENT BASE URL: {self.client.base_url}")
             
             self.enums = OpenAIEnums
             self.logger = logging.getLogger(__name__)
