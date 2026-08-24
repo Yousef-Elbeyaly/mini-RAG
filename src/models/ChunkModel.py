@@ -36,7 +36,7 @@ class ChunkModel(BaseDataModel):
         async with self.db_client() as session:
             async with session.begin():
                 for i in range(0, len(chunks), batch_size):
-                    batch = chunks[i : batch_size]
+                    batch = chunks[i : i + batch_size]
                     session.add_all(batch)
             await session.commit()
         return len(chunks)
@@ -48,9 +48,23 @@ class ChunkModel(BaseDataModel):
             await session.commit()
         return result.rowcount
 
-    async def get_project_chunks(self, project_id: ObjectId, page_no: int = 1, page_size: int= 50):
+    async def get_project_chunks(self, project_id: ObjectId, page_no: int = 1, page_size: int = 50):
         async with self.db_client() as session:
-            stat = select(DataChunk).where(DataChunk.chunk_project_id == project_id).offset((page_no - 1) * page_size).limit(page_size)
+            stat = select(DataChunk).where(DataChunk.chunk_project_id == project_id)
+            
+            if page_size is not None:
+                stat = stat.offset((page_no - 1) * page_size).limit(page_size)
+                
             result = await session.execute(stat)
             records = result.scalars().all()
         return records
+
+
+    async def get_total_chunk_count(self, project_id: ObjectId):
+        total_count = 0
+        async with self.db_client() as session:
+            count_sql = select(func.count(DataChunk.chunk_id)).where(DataChunk.chunk_project_id == project_id)
+            records_count = await session.execute(count_sql)
+            total_count = records_count.scalar()
+
+        return total_count

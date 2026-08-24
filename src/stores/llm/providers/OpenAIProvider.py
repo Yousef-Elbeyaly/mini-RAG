@@ -2,7 +2,7 @@ from ..LLMInterface import LLMInterface
 from ..LLMEnums import OpenAIEnums
 from openai import OpenAI
 import logging
-
+from typing import List, Union
 
 class OpenAIProvider(LLMInterface):
 
@@ -47,11 +47,14 @@ class OpenAIProvider(LLMInterface):
             temperature: float = None):
             raise NotImplementedError
 
-      def embed_text(self, text: str, document_types: str = None):
+      def embed_text(self, text: Union[str, List[str]], document_types: str = None):
 
             if not self.client:
                   self.logger.error("OpenAI client was not set")
                   return None
+
+            if isinstance(text, str):
+                  text = [text]
 
             if not self.embedding_model_id:
                   self.logger.error("Embedding model for OpenAI was not set")
@@ -66,14 +69,14 @@ class OpenAIProvider(LLMInterface):
                   self.logger.error("Error while embedding text with OpenAI")
                   return None
 
-            return response.data[0].embedding
+            return [rec.embedding for rec in response.data]
 
 
       def generate_text(self,  prompt: str, chat_history: list=None, max_output_tokens: int =None,
             temperature: float = None):
 
             if chat_history is None:
-                  chat_history = []
+                  chat_history = []      
 
                   
             if not self.client:

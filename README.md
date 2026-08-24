@@ -65,3 +65,11 @@ $ sudo docker compose up  -d
 $ cp .env.example .env
 ```
 - update `.env` with your credentials
+
+### Run Alembic Migration
+
+```bash
+$ alembic upgrade head
+```
+
+set your environment variables in the `.env` file. like `OPENAI_API_KEY` value.

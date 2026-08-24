@@ -2,6 +2,7 @@ from ..LLMInterface import LLMInterface
 from ..LLMEnums import CohereEnums, DocumentTypeEnums
 import cohere
 import logging
+from typing import List, Union
 
 class CoHereProvider(LLMInterface):
 
@@ -39,58 +40,60 @@ class CoHereProvider(LLMInterface):
 
     def generate_text(self,  prompt: str, chat_history: list=[], max_output_tokens: int =None,
                 temperature: float = None):
-            if not self.client:
-                self.logger.error("CoHere client was not set")
-                return None
+        if not self.client:
+            self.logger.error("CoHere client was not set")
+            return None
 
-            if not self.generation_model_id:
-                self.logger.error("Generation model for CoHere was not set")
-                return None
+        if not self.generation_model_id:
+            self.logger.error("Generation model for CoHere was not set")
+            return None
 
-            max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_max_output_tokens
-            temperature = temperature if temperature else self.default_generation_temperature
-            
-            response = self.client.chat(
-                model = self.generation_model_id,
-                chat_history = chat_history,
-                message = self.process_text(prompt),
-                temperature = temperature,
-                max_tokens = max_output_tokens
-            )
+        max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_max_output_tokens
+        temperature = temperature if temperature else self.default_generation_temperature
+        
+        response = self.client.chat(
+            model = self.generation_model_id,
+            chat_history = chat_history,
+            message = self.process_text(prompt),
+            temperature = temperature,
+            max_tokens = max_output_tokens
+        )
 
-            if not response or not response.text:
-                self.logger.error("Error while generating text with CoHere")
-                return None
+        if not response or not response.text:
+            self.logger.error("Error while generating text with CoHere")
+            return None
 
-            return response.text
+        return response.text
 
-    def embed_text(self, text: str, document_types: str = None):
+    def embed_text(self, text: Union[str, List[str]], document_types: str = None):
 
-            if not self.client:
-                self.logger.error("CoHere client was not set")
-                return None
+        if not self.client:
+            self.logger.error("CoHere client was not set")
+            return None
 
-            if not self.embedding_model_id:
-                self.logger.error("Embedding model for CoHere was not set")
-                return None
+        if isinstance(text, str):
+            text = [text]
 
-            input_type = CohereEnums.DOCUMENT
-            if document_types == DocumentTypeEnums.QUERY:
-                input_type = CohereEnums.QUERY
+        if not self.embedding_model_id:
+            self.logger.error("Embedding model for CoHere was not set")
+            return None
 
-            response = self.client.embed(
-                model = self.embedding_model_id,
-                texts = [self.process_text(text)],
-                input_type=input_type,
-                embedding_types=['float']
-            )
+        input_type = CohereEnums.DOCUMENT
+        if document_types == DocumentTypeEnums.QUERY:
+            input_type = CohereEnums.QUERY
 
-            if not response or not response.embeddings or not response.embeddings.float:
-                self.logger.error("Error while embedding text with CoHere")
-                return None
+        response = self.client.embed(
+            model = self.embedding_model_id,
+            texts = [self.process_text(t) for t in text],
+            input_type=input_type,
+            embedding_types=['float']
+        )
 
+        if not response or not response.embeddings or not response.embeddings.float:
+            self.logger.error("Error while embedding text with CoHere")
+            return None
 
-            return response.embeddings.float[0]
+        return [f for f in response.embeddings.float]
 
     def construct_prompt(self, prompt: str, role: str):
         return {
