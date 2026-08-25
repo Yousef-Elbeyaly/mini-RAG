@@ -46,17 +46,6 @@ $ cp .env.example .env
 
 set your environment variables in the `.env` file. Like `API_KEY` value.
 
-## Run the FastAPI server
-
-```bash
-$ uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-## POSTMAN Collection
-
-Download the POSTMAN collection from [/assets/mini-rag-app.postman_collection.json](/assets/mini-rag-app.postman_collection.json)
-
-
 ## Run Docker Compose Services
 
 ```bash
@@ -73,3 +62,13 @@ $ alembic upgrade head
 ```
 
 set your environment variables in the `.env` file. like `OPENAI_API_KEY` value.
+
+## Run the FastAPI server
+
+```bash
+$ uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## POSTMAN Collection
+
+Download the POSTMAN collection from [/assets/mini-rag-app.postman_collection.json](/assets/mini-rag-app.postman_collection.json)
