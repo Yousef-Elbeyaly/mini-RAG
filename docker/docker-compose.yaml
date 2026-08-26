@@ -37,7 +37,7 @@ services:
     image: pgvector/pgvector:0.8.0-pg17
     container_name: pgvector
     ports:
-      - "5432:5432"
+      - "5400:5432"
     volumes:
       - 'pgvector:/var/lib/postgresql/data'
     env_file:
@@ -136,6 +136,43 @@ services:
       - backend
     restart: always
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    env_file:
+      - ./env/.env.rabbitmq
+    networks:
+      - backend
+    restart: always
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:8.8.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    env_file:
+      - ./env/.env.redis
+    networks:
+      - backend
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 10s
+      retries: 5
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-minirag_redis_2222}"]
+
 networks:
   backend:
     driver: bridge
@@ -146,3 +183,5 @@ volumes:
   qdrant_data:
   prometheus_data:
   grafana_data:
+  rabbitmq_data:
+  redis_data:
