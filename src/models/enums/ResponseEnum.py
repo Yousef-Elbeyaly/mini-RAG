@@ -17,4 +17,4 @@ class ResponseSignal(Enum):
     RAG_ANSWER_ERROR = "rag_answer_error"
     RAG_ANSWER_SUCCESS = "rag_answer_success"
     NO_FILES_ERROR = "no_files_error"
-    
+    FILE_ID_ERROR = "file_id_error"
