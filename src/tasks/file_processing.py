@@ -6,8 +6,9 @@ from models.ChunkModel import ChunkModel
 from models.AssetModel import AssetModel
 from models.db_schemes import DataChunk, Asset
 from models.enums.AssetTypeEnum import AssetTypeEnum 
-from controllers import DataController, ProjectController, ProcessController, NLPController
+from controllers import ProcessController, NLPController
 from models import ResponseSignal
+from utils.idempotency_manager import IdempotencyManager
 import logging
 
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
                  autoretry_for=(Exception,),
                  retry_kwargs={"max_retries": 3, "countdown": 60})
 def process_project_files(self, project_id: int, file_id: int, chunk_size: int, overlap_size: int, do_reset: int):
-    asyncio.run(
+    return asyncio.run(
         _process_project_files(self, project_id, file_id, chunk_size, overlap_size, do_reset)
     )
 
@@ -25,12 +26,60 @@ async def _process_project_files(task_instance, project_id: int, file_id: int, c
 
 
     db_engine, vectordb_client = None, None
+
     try:
         (db_engine, db_client, llm_provider_factory,
         vectordb_provider_factroy,
         generation_client, embedding_client,
         vectordb_client, template_parser) = await get_setup_utils()
 
+        idempotency_manager = IdempotencyManager(db_client, db_engine)
+
+        task_args = {
+            "project_id": project_id,
+            "file_id":file_id,
+            "chunk_size": chunk_size,
+            "overlap_size": overlap_size,
+            "do_reset": do_reset
+        }
+
+        task_name = "tasks.file_processing.process_project_files"
+
+        settings = get_settings()
+
+        should_execute, existing_task = await idempotency_manager.should_execute_task(
+            task_name=task_name,
+            task_args=task_args,
+            celery_task_id=task_instance.request.id,
+            task_time_limit=settings.CELERY_TASK_TIME_LIMIT
+        )
+
+        if not should_execute:
+            status = existing_task.status if existing_task else "SUCCESS"
+            results = existing_task.results if existing_task else None
+            
+            logger.warning(f"Can not handle the task | status: {status}")
+            return results
+
+        task_record = None
+        if existing_task:
+            await idempotency_manager.update_task_status(
+                execution_id=existing_task.execution_id,
+                status='PENDING'
+            )
+            task_record = existing_task
+
+        else:
+            task_record = await idempotency_manager.create_task_record(
+                task_name=task_name,
+                task_args=task_args,
+                celery_task_id=task_instance.request.id
+            )
+
+        await idempotency_manager.update_task_status(
+            execution_id=task_record.execution_id,
+            status='STARTED'
+        )
 
         project_model = await ProjectModel.create_instance(
                 db_client=db_client
@@ -59,12 +108,18 @@ async def _process_project_files(task_instance, project_id: int, file_id: int, c
             )
 
             if asset_record is None:
+                
                 task_instance.update_state(
                     state="FAILURE",
                     meta={
                         "signal": ResponseSignal.FILE_ID_ERROR.value
                     }
                 )
+                await idempotency_manager.update_task_status(
+                            execution_id=task_record.execution_id,
+                            status='FAILURE',
+                            result={"signal": ResponseSignal.FILE_ID_ERROR.value}
+                        )
 
                 raise Exception(f"No assets for file: {file_id}")
 
@@ -92,6 +147,11 @@ async def _process_project_files(task_instance, project_id: int, file_id: int, c
                     "signal": ResponseSignal.NO_FILES_ERROR.value
                 }
             )
+            await idempotency_manager.update_task_status(
+                        execution_id=task_record.execution_id,
+                        status='FAILURE',
+                        result={"signal": ResponseSignal.NO_FILES_ERROR.value}
+                    )
 
             raise Exception(f"No files found dor project_id: {project.project_id}")
         
@@ -152,13 +212,18 @@ async def _process_project_files(task_instance, project_id: int, file_id: int, c
                     "signal": ResponseSignal.PROCESSING_SUCCESS.value
                 }
             )
-
-        logger.warning(f"Inserted_chunks: {no_records}")
+        await idempotency_manager.update_task_status(
+                    execution_id=task_record.execution_id,
+                    status='SUCCESS',
+                    result={"signal": ResponseSignal.PROCESSING_SUCCESS.value}
+                )
 
         return {
                 "signal": ResponseSignal.PROCESSING_SUCCESS.value,
                 "inserted_chunks": no_records,
-                "processed_files": no_files
+                "processed_files": no_files,
+                "project_id": project_id,
+                "do_reset": do_reset
             }
     except Exception as e:
         logger.error(f"Task failed: {str(e)}")

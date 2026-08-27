@@ -11,7 +11,6 @@ settings = get_settings()
 
 async def get_setup_utils():
     settings = get_settings()
-
     postgres_conn = f"postgresql+asyncpg://{settings.POSTGRES_USERNAME}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_MAIN_DATABASE}"
     db_engine = create_async_engine(postgres_conn)
 
@@ -20,7 +19,7 @@ async def get_setup_utils():
     )
 
     llm_provider_factory =  LLMProviderFactory(settings)
-    vectordb_provider_factroy = VectorDBProviderFactory(config=settings, db_client=app.db_client)
+    vectordb_provider_factroy = VectorDBProviderFactory(config=settings, db_client=db_client)
 
     # generation client
     generation_client = llm_provider_factory.create(provider = settings.GENERATION_BACKEND)
@@ -52,8 +51,10 @@ celery_app = Celery(
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
     include=[
-        "tasks.mail_service",
-        "tasks.file_processing"
+        "tasks.file_processing",
+        "tasks.data_indexing",
+        "tasks.process_workflow",
+        "tasks.maintenance",
     ]
 )
 
@@ -74,9 +75,21 @@ celery_app.conf.update(
     broker_connection_max_retries=10,
     worker_cancel_long_running_tasks_on_connection_loss=True,
     task_routes = {
-        "tasks.mail_service.send_email_reports": {"queue": "mail_server_queue"},
-        "tasks.file_processing.process_project_files": {"queue": "file_processing"}
-    }
+        "tasks.file_processing.process_project_files": {"queue": "file_processing"},
+        "tasks.data_indexing.index_data_content": {"queue": "data_indexing"},
+        "tasks.process_workflow.process_and_push_workflow": {"queue": "file_processing"},
+        "tasks.maintenance.clean_celery_execution_table": {"queue": "default"},
+    },
+
+    beat_schedule={
+        "cleanup_old_task_records": {
+            'task': "tasks.maintenance.clean_celery_execution_table",
+            "schedule": 10,
+
+        }
+    },
+
+    timezone='UTC',
 )
 
 celery_app.conf.task_default_queue = "default"

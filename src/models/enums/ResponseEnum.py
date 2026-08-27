@@ -18,3 +18,5 @@ class ResponseSignal(Enum):
     RAG_ANSWER_SUCCESS = "rag_answer_success"
     NO_FILES_ERROR = "no_files_error"
     FILE_ID_ERROR = "file_id_error"
+    DATA_PUSH_TASK_READY="data_push_task_ready"
+    PROCESS_AND_PUSH_WORKFLOW_READY = "process_and_push_workflow_ready"
